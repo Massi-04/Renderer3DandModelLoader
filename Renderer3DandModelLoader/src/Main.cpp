@@ -106,7 +106,7 @@ void InitApp()
 
 void Update()
 {
-    static float change = 0.00005f;
+    static float change = 0.005f;
     static float col = 1.0f;
     
     if (col < 0.0f || col > 1.0f)
