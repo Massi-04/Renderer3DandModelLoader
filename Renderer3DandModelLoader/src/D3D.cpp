@@ -6,6 +6,7 @@ IDXGISwapChain* GSwapChain = nullptr;
 ID3D11Device* GDevice = nullptr;
 ID3D11DeviceContext* GContext = nullptr;
 ID3D11RenderTargetView* GRenderTargetView = nullptr;
+ID3D11DepthStencilView* GDepthBufferView = nullptr;
 
 static const char const* SHADER_ENTRY_POINT = "main";
 
@@ -16,7 +17,6 @@ static const char* shaderTargets[] =
 };
 
 static ID3D11Texture2D* s_DepthBuffer;
-static ID3D11DepthStencilView* s_DepthBufferView;
 
 void InitD3D()
 {
@@ -58,17 +58,27 @@ void InitD3D()
 	backBuffer->Release();
 
 	s_DepthBuffer = CreateTexture2D(wndProps.Width, wndProps.Height, DepthBufferFormat, Default, DepthBuffer, None);
-	checkf(GDevice->CreateDepthStencilView(s_DepthBuffer, nullptr, &s_DepthBufferView) == S_OK, "impossible creare il depth buffer view");
+	checkf(GDevice->CreateDepthStencilView(s_DepthBuffer, nullptr, &GDepthBufferView) == S_OK, "impossible creare il depth buffer view");
 
-	GContext->OMSetRenderTargets(1, &GRenderTargetView, s_DepthBufferView);
+	GContext->OMSetRenderTargets(1, &GRenderTargetView, GDepthBufferView);
+
+	D3D11_VIEWPORT viewport = {};
+	viewport.TopLeftX = 0;
+	viewport.TopLeftY = 0;
+	viewport.Width = wndProps.Width;
+	viewport.Height = wndProps.Height;
+	viewport.MinDepth = 0.0f;
+	viewport.MaxDepth = 1.0f;
+
+	GContext->RSSetViewports(1, &viewport);
 }
 
-ID3D11Buffer* CreateBuffer(EBindFlags type, ECPUAccessFlags cpuAccessFlags, size_t sizeBytes, void* data)
+ID3D11Buffer* CreateBuffer(EResourseUsage usage, EBindFlags type, ECPUAccessFlags cpuAccessFlags, size_t sizeBytes, void* data)
 {
 	ID3D11Buffer* res = nullptr;
 
 	D3D11_BUFFER_DESC bufferDesc = {};
-	bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+	bufferDesc.Usage = (D3D11_USAGE)usage;
 	bufferDesc.ByteWidth = (UINT)sizeBytes;
 	bufferDesc.BindFlags = type;
 	bufferDesc.CPUAccessFlags = cpuAccessFlags;
@@ -123,8 +133,6 @@ ID3DBlob* CompileShader(const WString& file, EShaderType type)
 
 	checkf(!compileErrors, (const char*)compileErrors->GetBufferPointer());
 
-	compileErrors->Release();
-
 	return compileResult;
 }
 
@@ -137,8 +145,6 @@ ID3D11VertexShader* CreateVertexShader(ID3DBlob* compiledShader)
 		compiledShader->GetBufferPointer(), compiledShader->GetBufferSize(), nullptr, &res
 	) == S_OK, "impossibile creare la vertex shader");
 
-	compiledShader->Release();
-
 	return res;
 }
 
@@ -150,8 +156,6 @@ ID3D11PixelShader* CreatePixelShader(ID3DBlob* compiledShader)
 	(
 		compiledShader->GetBufferPointer(), compiledShader->GetBufferSize(), nullptr, &res
 	) == S_OK, "impossibile creare la pixel shader");
-
-	compiledShader->Release();
 
 	return res;
 }

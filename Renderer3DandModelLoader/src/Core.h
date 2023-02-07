@@ -21,3 +21,18 @@ void ShowAlert(const String& msg);
 
 #define checkf(Condition, Msg) { if(!(Condition)) { ShowAlert(String("Assertion failed: ").append(Msg));  __debugbreak(); } }
 #define check(Condition) { checkf(Condition, "") }
+
+struct Vec2
+{
+	float X, Y;
+};
+
+struct Vec3
+{
+	float X, Y, Z;
+};
+
+struct Vec4
+{
+	float X, Y, Z, W;
+};
