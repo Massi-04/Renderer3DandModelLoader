@@ -3,6 +3,7 @@
 #include "Core.h"
 #include <d3d11.h>
 
+extern bool GD3DInitalized;
 extern IDXGISwapChain* GSwapChain;
 extern ID3D11Device* GDevice;
 extern ID3D11DeviceContext* GContext;
@@ -53,3 +54,5 @@ ID3D11Texture2D* CreateTexture2D(uint32_t width, uint32_t height, EColorFormat f
 ID3DBlob* CompileShader(const WString& file, EShaderType type);
 ID3D11VertexShader* CreateVertexShader(ID3DBlob* compiledShader);
 ID3D11PixelShader* CreatePixelShader(ID3DBlob* compiledShader);
+
+void ResizeFrameBuffer(uint32_t newClientWidth, uint32_t newClientHeight);

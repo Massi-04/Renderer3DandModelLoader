@@ -2,14 +2,34 @@
 #include "Window.h"
 #include "D3D.h"
 
+#include <DirectXMath.h>
+
 void InitApp();
 void Update();
 void Render();
+
+struct Transform
+{
+    Vec3 Location;
+    Vec3 Rotation;
+    Vec3 Scale;
+};
+
+struct Camera
+{
+    Vec3 Location;
+    Vec3 Rotation;
+    float FOV;
+};
 
 static float s_ClearColor[4] =
 {
     .2f, .2f, 0.0f, 1.0f
 };
+
+static ID3D11Buffer* mvpBuffer;
+static Transform model;
+static Camera cam;
 
 INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, INT nCmdShow)
 {   
@@ -45,6 +65,18 @@ struct Vertex
 
 void InitApp()
 {
+    // app
+
+    model.Location = { 0.0f, 0.0f, 0.0f };
+    model.Rotation = { 0.0f, 0.0f, 0.0f };
+    model.Scale = { 1.0f, 1.0f, 1.0f };
+
+    cam.Location = { 0.0f, 0.0f, -1.0f };
+    cam.Rotation = { 0.0f, 0.0f, 0.0f };
+    cam.FOV = 90;
+
+    // d3d
+
     ID3DBlob* vertexShaderCode = CompileShader(L"assets/vertex.hlsl", VertexShader);
     ID3DBlob* pixelShaderCode = CompileShader(L"assets/pixel.hlsl", PixelShader);
 
@@ -70,8 +102,13 @@ void InitApp()
         ),
         Vertex
         (
-            {  0.0f,  0.5f, 0.0f, 1.0f },
+            { -0.5f,  0.5f, 0.0f, 1.0f },
             {  0.0f,  1.0f, 0.0f, 1.0f }
+        ),
+        Vertex
+        (
+            {  0.5f,  0.5f, 0.0f, 1.0f },
+            {  0.0f,  0.0f, 1.0f, 1.0f }
         ),
         Vertex
         (
@@ -88,7 +125,8 @@ void InitApp()
 
     uint32_t indexBufferData[] =
     {
-        0, 1, 2
+        0, 1, 2,
+        0, 2, 3
     };
 
     ID3D11Buffer* indexBuffer = CreateBuffer(Default, IndexBuffer, None, sizeof(indexBufferData), indexBufferData);
@@ -102,10 +140,43 @@ void InitApp()
 
     vertexShaderCode->Release();
     pixelShaderCode->Release();
+
+    mvpBuffer = CreateBuffer(Dynamic, ConstBuffer, Write, sizeof(DirectX::XMMATRIX), 0);
+
+    GContext->VSSetConstantBuffers(0, 1, &mvpBuffer);
+}
+
+DirectX::XMMATRIX GetModelMatrix(const Transform& transform)
+{
+    return
+    {
+        DirectX::XMMatrixScaling(transform.Scale.X, transform.Scale.Y, transform.Scale.Z)
+        *
+        DirectX::XMMatrixRotationRollPitchYawFromVector({ transform.Rotation.X, transform.Rotation.Y, transform.Rotation.Z, 0.0f })
+        *
+        DirectX::XMMatrixTranslation(transform.Location.X, transform.Location.Y, transform.Location.Z)
+    };
+}
+
+DirectX::XMMATRIX GetViewMatrix(Vec3 camLocation, Vec3 camRotation)
+{
+    return
+    {
+        DirectX::XMMatrixRotationRollPitchYawFromVector({-camRotation.X, -camRotation.Y, -camRotation.Z, 0.0f})
+        *
+        DirectX::XMMatrixTranslation(-camLocation.X, -camLocation.Y, -camLocation.Z)
+    };
+}
+
+DirectX::XMMATRIX GetPerspectiveMatrix(float aspectRatio, float fov)
+{
+    return DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(fov), aspectRatio, 0.1f, 100.0f);
 }
 
 void Update()
 {
+    // background color
+    
     static float change = 0.005f;
     static float col = 1.0f;
     
@@ -114,13 +185,35 @@ void Update()
 
     col += change;
 
-    s_ClearColor[2] = col / 1;
+   // s_ClearColor[2] = col / 1;
+    
+    // mvp
+
+    model.Rotation.Z += 0.005f;
+
+    float wndWidth = (float)GetWndProps().Width;
+    float wndHeight = (float)GetWndProps().Height;
+    float aspectRatio = wndWidth / wndHeight;
+    
+    auto mvp = GetModelMatrix(model)
+        * GetViewMatrix(cam.Location, cam.Rotation)
+        * GetPerspectiveMatrix(aspectRatio, cam.FOV);
+
+    mvp = DirectX::XMMatrixTranspose(mvp);
+
+    D3D11_MAPPED_SUBRESOURCE res = {};
+
+    GContext->Map(mvpBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &res);
+
+    memcpy(res.pData, &mvp, sizeof(DirectX::XMMATRIX));
+
+    GContext->Unmap(mvpBuffer, 0);
 }
 
 void Render()
 {
     GContext->ClearRenderTargetView(GRenderTargetView, s_ClearColor);
     GContext->ClearDepthStencilView(GDepthBufferView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
-    GContext->DrawIndexed(3, 0, 0);
+    GContext->DrawIndexed(6, 0, 0);
     GSwapChain->Present(1, 0);
 }

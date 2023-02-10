@@ -1,9 +1,17 @@
 #include "Window.h"
 
+#include "D3D.h"
+
+void OnWndResize(uint32_t, uint32_t);
+
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	switch (uMsg)
 	{
+	case WM_SIZE:
+		OnWndResize(LOWORD(lParam), HIWORD(lParam));
+		break;
+
 	case WM_CLOSE:
 		GAppShouldRun = false;
 		break;
@@ -50,4 +58,12 @@ void PullEvents()
 		TranslateMessage(&msg);
 		DispatchMessageA(&msg);
 	}
+}
+
+void OnWndResize(uint32_t newWidth, uint32_t newHeight)
+{
+	sWndProps.Width = newWidth;
+	sWndProps.Height = newHeight;
+	if(GD3DInitalized)
+		ResizeFrameBuffer(newWidth, newHeight);
 }

@@ -4,10 +4,15 @@ struct VSOutput
 	float4 Col : Color;
 };
 
+cbuffer roba
+{
+	float4x4 mvp;
+};
+
 VSOutput main(float4 loc : Location, float4 col : Color)
 {
 	VSOutput res;
-	res.Loc = loc;
+	res.Loc = mul(loc, mvp);
 	res.Col = col;
 	return res;
 }

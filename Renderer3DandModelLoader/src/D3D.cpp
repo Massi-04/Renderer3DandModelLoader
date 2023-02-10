@@ -2,6 +2,7 @@
 #include "Window.h"
 #include <d3dcompiler.h>
 
+bool GD3DInitalized = false;
 IDXGISwapChain* GSwapChain = nullptr;
 ID3D11Device* GDevice = nullptr;
 ID3D11DeviceContext* GContext = nullptr;
@@ -29,6 +30,7 @@ void InitD3D()
     sd.BufferDesc.Width = wndProps.Width;
     sd.BufferDesc.Height = wndProps.Height;
     sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	sd.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
     sd.BufferDesc.RefreshRate.Numerator = wndProps.Refreshrate;
     sd.BufferDesc.RefreshRate.Denominator = 1;
     sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
@@ -71,6 +73,8 @@ void InitD3D()
 	viewport.MaxDepth = 1.0f;
 
 	GContext->RSSetViewports(1, &viewport);
+
+	GD3DInitalized = true;
 }
 
 ID3D11Buffer* CreateBuffer(EResourseUsage usage, EBindFlags type, ECPUAccessFlags cpuAccessFlags, size_t sizeBytes, void* data)
@@ -158,4 +162,44 @@ ID3D11PixelShader* CreatePixelShader(ID3DBlob* compiledShader)
 	) == S_OK, "impossibile creare la pixel shader");
 
 	return res;
+}
+
+void ResizeFrameBuffer(uint32_t newClientWidth, uint32_t newClientHeight)
+{
+	GContext->OMSetRenderTargets(0, 0, 0);
+
+	GRenderTargetView->Release();
+
+	checkf(GSwapChain->ResizeBuffers(0, newClientWidth, newClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM, 0) == S_OK,
+		"impossibile resizare il back buffer!");
+
+	ID3D11Texture2D* backBuffer;
+	
+	checkf(GSwapChain->GetBuffer(0 /*first buffer (back buffer)*/, __uuidof(ID3D11Texture2D), (void**)&backBuffer)
+		== S_OK, "impossibile trovare il backbuffer ???");
+
+	checkf(GDevice->CreateRenderTargetView(backBuffer, nullptr, &GRenderTargetView) == S_OK,
+		"impossibile creare il nuovo rendertargetview");
+
+	backBuffer->Release();
+
+	GDepthBufferView->Release();
+	s_DepthBuffer->Release();
+
+	s_DepthBuffer = CreateTexture2D(newClientWidth, newClientHeight, DepthBufferFormat, Default, DepthBuffer, None);
+	checkf(GDevice->CreateDepthStencilView(s_DepthBuffer, nullptr, &GDepthBufferView) == S_OK, "impossible creare il depth buffer view");
+
+
+	GContext->OMSetRenderTargets(1, &GRenderTargetView, GDepthBufferView);
+
+	// Set up the viewport.
+	D3D11_VIEWPORT viewport = {};
+	viewport.TopLeftX = 0;
+	viewport.TopLeftY = 0;
+	viewport.Width = newClientWidth;
+	viewport.Height = newClientHeight;
+	viewport.MinDepth = 0.0f;
+	viewport.MaxDepth = 1.0f;
+
+	GContext->RSSetViewports(1, &viewport);
 }
