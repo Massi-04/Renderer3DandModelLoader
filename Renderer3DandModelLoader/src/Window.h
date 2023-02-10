@@ -11,5 +11,6 @@ struct WindowProps
 
 void SpawnWindow(HINSTANCE hInstance, const WindowProps& props);
 const WindowProps& GetWndProps();
+float GetWndAspectRatio();
 
 void PullEvents();

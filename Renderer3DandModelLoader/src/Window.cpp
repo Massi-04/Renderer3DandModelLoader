@@ -50,6 +50,11 @@ const WindowProps& GetWndProps()
 	return sWndProps;
 }
 
+float GetWndAspectRatio()
+{
+	return (float)sWndProps.Width / sWndProps.Height;
+}
+
 void PullEvents()
 {
 	MSG msg;

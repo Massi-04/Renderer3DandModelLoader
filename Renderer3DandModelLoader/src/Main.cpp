@@ -175,29 +175,14 @@ DirectX::XMMATRIX GetPerspectiveMatrix(float aspectRatio, float fov)
 
 void Update()
 {
-    // background color
-    
-    static float change = 0.005f;
-    static float col = 1.0f;
-    
-    if (col < 0.0f || col > 1.0f)
-        change *= -1;
-
-    col += change;
-
-   // s_ClearColor[2] = col / 1;
-    
-    // mvp
-
     model.Rotation.Z += 0.005f;
-
-    float wndWidth = (float)GetWndProps().Width;
-    float wndHeight = (float)GetWndProps().Height;
-    float aspectRatio = wndWidth / wndHeight;
     
-    auto mvp = GetModelMatrix(model)
-        * GetViewMatrix(cam.Location, cam.Rotation)
-        * GetPerspectiveMatrix(aspectRatio, cam.FOV);
+    auto mvp = 
+        GetModelMatrix(model)
+        * 
+        GetViewMatrix(cam.Location, cam.Rotation)
+        * 
+        GetPerspectiveMatrix(GetWndAspectRatio(), cam.FOV);
 
     mvp = DirectX::XMMatrixTranspose(mvp);
 
