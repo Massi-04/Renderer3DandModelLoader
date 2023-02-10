@@ -2,10 +2,16 @@
 
 #include "D3D.h"
 
+#include "vendor/imgui/backends/imgui_impl_win32.h"
+
 void OnWndResize(uint32_t, uint32_t);
+
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
+	ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam);
+
 	switch (uMsg)
 	{
 	case WM_SIZE:

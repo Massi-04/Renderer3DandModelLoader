@@ -4,9 +4,21 @@
 
 #include <DirectXMath.h>
 
+#include "vendor/imgui/imgui.h"
+#include "vendor/imgui/backends/imgui_impl_win32.h"
+#include "vendor/imgui/backends/imgui_impl_dx11.h"
+
 void InitApp();
 void Update();
-void Render();
+
+void InitImGui();
+void ImGuiBegin();
+void ImGuiRender();
+void ImGuiEnd();
+
+void RendererBeginScene();
+void RendererRender();
+void RendererEndScene();
 
 struct Transform
 {
@@ -41,11 +53,22 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
 
     InitApp();
 
+    InitImGui();
+
     while (GAppShouldRun)
     {
         PullEvents();
+        
         Update();
-        Render();
+
+        RendererBeginScene();
+        RendererRender();
+        
+        ImGuiBegin();
+        ImGuiRender();
+        ImGuiEnd();
+        
+        RendererEndScene();
     }
 
     return 0;
@@ -195,10 +218,44 @@ void Update()
     GContext->Unmap(mvpBuffer, 0);
 }
 
-void Render()
+void RendererBeginScene()
 {
     GContext->ClearRenderTargetView(GRenderTargetView, s_ClearColor);
     GContext->ClearDepthStencilView(GDepthBufferView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+}
+
+void RendererRender()
+{
     GContext->DrawIndexed(6, 0, 0);
+}
+
+void RendererEndScene()
+{
     GSwapChain->Present(1, 0);
+}
+
+void InitImGui()
+{
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
+    checkf(ImGui_ImplWin32_Init(GWnd), "impossibile inizializzare imgui per win32");
+    checkf(ImGui_ImplDX11_Init(GDevice, GContext), "impossibile inizializzare imgui per dx11");
+}
+
+void ImGuiBegin()
+{
+    ImGui_ImplDX11_NewFrame();
+    ImGui_ImplWin32_NewFrame();
+    ImGui::NewFrame();
+}
+
+void ImGuiRender()
+{
+    ImGui::ShowDemoWindow();
+}
+
+void ImGuiEnd()
+{
+    ImGui::Render();
+    ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 }
