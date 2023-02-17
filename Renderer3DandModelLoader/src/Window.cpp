@@ -14,6 +14,32 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 	switch (uMsg)
 	{
+	case WM_KEYDOWN:
+	{
+		switch (wParam)
+		{
+			case VK_F3:
+			{
+				EFillMode fillMode = GetCurrentRasterizerDesc().FillMode;
+				SetFillMode(fillMode == FillSolid ? Wireframe : FillSolid);
+			}
+			break;
+
+			case VK_F4:
+			{
+				ECullMode cullMode = GetCurrentRasterizerDesc().CullMode;
+				if (cullMode == NoCull)
+					SetCullMode(Back);
+				else if (cullMode == Back)
+					SetCullMode(Front);
+				else
+					SetCullMode(NoCull);
+			}
+			break;
+		}
+	}
+	break;
+
 	case WM_SIZE:
 		OnWndResize(LOWORD(lParam), HIWORD(lParam));
 		break;

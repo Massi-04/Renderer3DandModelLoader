@@ -8,6 +8,8 @@ ID3D11Device* GDevice = nullptr;
 ID3D11DeviceContext* GContext = nullptr;
 ID3D11RenderTargetView* GRenderTargetView = nullptr;
 ID3D11DepthStencilView* GDepthBufferView = nullptr;
+ID3D11RasterizerState* GRasterizerState = nullptr;
+ID3D11SamplerState* GSamplerState = nullptr;
 
 static const char const* SHADER_ENTRY_POINT = "main";
 
@@ -18,6 +20,8 @@ static const char* shaderTargets[] =
 };
 
 static ID3D11Texture2D* s_DepthBuffer;
+
+static RasterizerDesc sRasterDesc = { FillSolid, Back } ;
 
 void InitD3D()
 {
@@ -74,6 +78,22 @@ void InitD3D()
 
 	GContext->RSSetViewports(1, &viewport);
 
+	SetRasterizerState(sRasterDesc);
+
+	D3D11_SAMPLER_DESC samplerDesc = {};
+	samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+	samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+	samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+	samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+	samplerDesc.MinLOD = 0;
+	samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
+
+	checkf(GDevice->CreateSamplerState(&samplerDesc, &GSamplerState) == S_OK, 
+		"impossibile creare il sampler state!");
+
+	GContext->PSSetSamplers(0, 1, &GSamplerState);
+
 	GD3DInitalized = true;
 }
 
@@ -98,7 +118,7 @@ ID3D11Buffer* CreateBuffer(EResourseUsage usage, EBindFlags type, ECPUAccessFlag
 	return res;
 }
 
-ID3D11Texture2D* CreateTexture2D(uint32_t width, uint32_t height, EColorFormat format, EResourseUsage usage, EBindFlags bindType, ECPUAccessFlags cpuAccessFlags, void* data)
+ID3D11Texture2D* CreateTexture2D(uint32_t width, uint32_t height, EColorFormat format, EResourseUsage usage, EBindFlags bindType, ECPUAccessFlags cpuAccessFlags, void* data, uint32_t dataPitch)
 {
 	ID3D11Texture2D* res = nullptr;
 
@@ -115,7 +135,7 @@ ID3D11Texture2D* CreateTexture2D(uint32_t width, uint32_t height, EColorFormat f
 
 	D3D11_SUBRESOURCE_DATA texData = {};
 	texData.pSysMem = data;
-	texData.SysMemPitch = 0;
+	texData.SysMemPitch = (UINT)dataPitch;
 	texData.SysMemSlicePitch = 0;
 
 	checkf(GDevice->CreateTexture2D(&desc, data ? &texData : 0, &res) == S_OK, "impossibile creare la texture2d");
@@ -166,6 +186,9 @@ ID3D11PixelShader* CreatePixelShader(ID3DBlob* compiledShader)
 
 void ResizeFrameBuffer(uint32_t newClientWidth, uint32_t newClientHeight)
 {
+	if (!newClientWidth && !newClientHeight)
+		return;
+
 	GContext->OMSetRenderTargets(0, 0, 0);
 
 	GRenderTargetView->Release();
@@ -202,4 +225,39 @@ void ResizeFrameBuffer(uint32_t newClientWidth, uint32_t newClientHeight)
 	viewport.MaxDepth = 1.0f;
 
 	GContext->RSSetViewports(1, &viewport);
+}
+
+void SetRasterizerState(RasterizerDesc desc)
+{
+	GContext->RSSetState(nullptr);
+
+	if (GRasterizerState)
+		GRasterizerState->Release();
+
+	D3D11_RASTERIZER_DESC rasterizerDesc = {};
+
+	rasterizerDesc.FillMode = (D3D11_FILL_MODE)desc.FillMode;
+	rasterizerDesc.CullMode = (D3D11_CULL_MODE)desc.CullMode;
+
+	checkf(GDevice->CreateRasterizerState(&rasterizerDesc, &GRasterizerState) == S_OK,
+		"impossibile craere il rasterizer state");
+
+	GContext->RSSetState(GRasterizerState);
+
+	sRasterDesc = desc;
+}
+
+RasterizerDesc GetCurrentRasterizerDesc()
+{
+	return sRasterDesc;
+}
+
+void SetFillMode(EFillMode fillMode)
+{
+	SetRasterizerState( { fillMode, sRasterDesc.CullMode } );
+}
+
+void SetCullMode(ECullMode cullMode)
+{
+	SetRasterizerState({ sRasterDesc.FillMode, cullMode });
 }
