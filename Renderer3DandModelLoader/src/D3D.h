@@ -81,4 +81,5 @@ RasterizerDesc GetCurrentRasterizerDesc();
 void SetRasterizerState(RasterizerDesc desc);
 void SetFillMode(EFillMode fillMode);
 void SetCullMode(ECullMode cullMode);
+void SetFullscreen(bool fullscreen);
 

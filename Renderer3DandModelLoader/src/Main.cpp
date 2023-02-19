@@ -118,12 +118,12 @@ void ClearMeshes()
 
 void AddMesh(const char* fbxFilePath)
 {
-    std::vector<MeshData> meshData = LoadFbx(fbxFilePath);
+   /* std::vector<MeshData> meshData = LoadFbx(fbxFilePath);
 
     for (MeshData& md : meshData)
     {
         s_Meshes.push_back(new Mesh(&md));
-    }
+    }*/
 }
 
 void ClearTextures()
@@ -176,7 +176,7 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
 
     InitD3D();
 
-    FbxLoaderInit();
+    //FbxLoaderInit();
 
     InitTimer();
 
@@ -218,7 +218,7 @@ void InitApp()
 
     cam.Location = { 0.0f, 0.0f, -1.0f };
     cam.Rotation = { 0.0f, 0.0f, 0.0f };
-    cam.FOV = 90;
+    cam.FOV = 60;
 
     // d3d
 
@@ -262,33 +262,6 @@ void InitApp()
     s_Textures.push_back(defaultTex);
 }
 
-DirectX::XMMATRIX GetModelMatrix(const Transform& transform)
-{
-    return
-    {
-        DirectX::XMMatrixTranslation(transform.Location.X, transform.Location.Y, transform.Location.Z)
-        *
-        DirectX::XMMatrixRotationRollPitchYawFromVector(VEC_TO_RAD(transform.Rotation))
-        *
-        DirectX::XMMatrixScaling(transform.Scale.X, transform.Scale.Y, transform.Scale.Z)
-    };
-}
-
-DirectX::XMMATRIX GetViewMatrix(Vec3 camLocation, Vec3 camRotation)
-{
-    return
-    {
-        DirectX::XMMatrixTranslation(camLocation.X, camLocation.Y, camLocation.Z)
-        *
-        DirectX::XMMatrixRotationRollPitchYawFromVector(VEC_TO_RAD(camRotation))
-    };
-}
-
-DirectX::XMMATRIX GetPerspectiveMatrix(float aspectRatio, float fov)
-{
-    return DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(fov), aspectRatio, 0.1f, 1000.0f);
-}
-
 Vec3 GetForwardVector(Vec3 rotation)
 {
     rotation = VEC_TO_RAD(rotation);
@@ -320,6 +293,31 @@ Vec3 GetUpVector(Vec3 rotation)
     DirectX::XMVECTOR up = DirectX::XMVector3Cross(VEC_TO_XVEC(GetForwardVector(rotation)), VEC_TO_XVEC(GetRightVector(rotation)));
 
     return { up.m128_f32[0], up.m128_f32[1], up.m128_f32[2] };
+}
+
+DirectX::XMMATRIX GetModelMatrix(const Transform& transform)
+{
+    return
+    {
+        DirectX::XMMatrixTranslation(transform.Location.X, transform.Location.Y, transform.Location.Z)
+        *
+        DirectX::XMMatrixRotationRollPitchYawFromVector(VEC_TO_RAD(transform.Rotation))
+        *
+        DirectX::XMMatrixScaling(transform.Scale.X, transform.Scale.Y, transform.Scale.Z)
+    };
+}
+
+DirectX::XMMATRIX GetViewMatrix(Vec3 camLocation, Vec3 camRotation)
+{
+    auto defaultView = DirectX::XMMatrixLookAtLH(VEC_TO_XVEC(camLocation), VEC_TO_XVEC((GetForwardVector(camRotation) + camLocation)), VEC_TO_XVEC(GetUpVector(camRotation)));
+    auto zRotation = DirectX::XMMatrixRotationZ(DirectX::XMConvertToRadians(camRotation.Z));
+
+    return defaultView * zRotation;
+}
+
+DirectX::XMMATRIX GetPerspectiveMatrix(float aspectRatio, float fov)
+{
+    return DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(fov), aspectRatio, 0.1f, 1000.0f);
 }
 
 void MoveCameraForward(float direction)
@@ -410,9 +408,9 @@ void Update()
     // update MVP
     auto mvp = 
         GetModelMatrix(model)
-        * 
-        GetViewMatrix(-cam.Location, -cam.Rotation)
-        * 
+        *
+        GetViewMatrix(cam.Location, cam.Rotation)
+        *
         GetPerspectiveMatrix(GetWndAspectRatio(), cam.FOV);
 
     mvp = DirectX::XMMatrixTranspose(mvp);
@@ -589,7 +587,15 @@ void SceneSettings()
 {
     IM_SUBMENU
     (
-        "Rasterizer",
+        "Boh",
+        const WindowProps& wndProps = GetWndProps();
+        ImGui::Text("Client size: %ix%i", wndProps.Width, wndProps.Height);
+        ImGui::Text("(F11 to swap) Fullscreen state: %s", wndProps.Fullscreen ? "Fullscreen" : "Windowed");
+    );
+
+    IM_SUBMENU
+    (
+        "Renderer / Rasterizer",
         RasterizerDesc rd = GetCurrentRasterizerDesc();
         ImGui::Text("(F3 to swap) Fill mode: %s", GetFillModeStr(rd.FillMode));
         ImGui::Text("(F4 to swap) Cull mode: %s", GetCullModeStr(rd.CullMode));

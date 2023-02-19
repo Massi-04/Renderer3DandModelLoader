@@ -65,6 +65,11 @@ struct Vec3
         return { X * v.X, Y * v.Y, Z * v.Z };
     }
 
+    inline Vec3 operator+(Vec3 v)
+    {
+        return { X + v.X, Y + v.Y, Z + v.Z };
+    }
+
     inline Vec3 operator*(float f)
     {
         return { X * f, Y * f, Z * f };

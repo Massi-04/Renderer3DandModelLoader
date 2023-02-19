@@ -54,29 +54,7 @@ void InitD3D()
 
 	// setup rendertarget and depthbuffer
 
-	ID3D11Texture2D* backBuffer;
-	GSwapChain->GetBuffer(0 /*first buffer (back buffer)*/, __uuidof(ID3D11Texture2D), (void**)&backBuffer);
-
-	checkf(backBuffer, "back buffer is null WTF");
-
-	checkf(GDevice->CreateRenderTargetView(backBuffer, nullptr, &GRenderTargetView) == S_OK, "impossible creare il render target view");
-
-	backBuffer->Release();
-
-	s_DepthBuffer = CreateTexture2D(wndProps.Width, wndProps.Height, DepthBufferFormat, Default, DepthBuffer, None);
-	checkf(GDevice->CreateDepthStencilView(s_DepthBuffer, nullptr, &GDepthBufferView) == S_OK, "impossible creare il depth buffer view");
-
-	GContext->OMSetRenderTargets(1, &GRenderTargetView, GDepthBufferView);
-
-	D3D11_VIEWPORT viewport = {};
-	viewport.TopLeftX = 0;
-	viewport.TopLeftY = 0;
-	viewport.Width = wndProps.Width;
-	viewport.Height = wndProps.Height;
-	viewport.MinDepth = 0.0f;
-	viewport.MaxDepth = 1.0f;
-
-	GContext->RSSetViewports(1, &viewport);
+	ResizeFrameBuffer(wndProps.Width, wndProps.Height);
 
 	SetRasterizerState(sRasterDesc);
 
@@ -191,7 +169,8 @@ void ResizeFrameBuffer(uint32_t newClientWidth, uint32_t newClientHeight)
 
 	GContext->OMSetRenderTargets(0, 0, 0);
 
-	GRenderTargetView->Release();
+	if(GRenderTargetView)
+		GRenderTargetView->Release();
 
 	checkf(GSwapChain->ResizeBuffers(0, newClientWidth, newClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM, 0) == S_OK,
 		"impossibile resizare il back buffer!");
@@ -206,8 +185,11 @@ void ResizeFrameBuffer(uint32_t newClientWidth, uint32_t newClientHeight)
 
 	backBuffer->Release();
 
-	GDepthBufferView->Release();
-	s_DepthBuffer->Release();
+	if(GDepthBufferView)
+		GDepthBufferView->Release();
+
+	if(s_DepthBuffer)
+		s_DepthBuffer->Release();
 
 	s_DepthBuffer = CreateTexture2D(newClientWidth, newClientHeight, DepthBufferFormat, Default, DepthBuffer, None);
 	checkf(GDevice->CreateDepthStencilView(s_DepthBuffer, nullptr, &GDepthBufferView) == S_OK, "impossible creare il depth buffer view");
@@ -225,6 +207,15 @@ void ResizeFrameBuffer(uint32_t newClientWidth, uint32_t newClientHeight)
 	viewport.MaxDepth = 1.0f;
 
 	GContext->RSSetViewports(1, &viewport);
+
+	DXGI_SWAP_CHAIN_DESC updatedDesc;
+
+	checkf(GSwapChain->GetDesc(&updatedDesc) == S_OK, "impossibile gettare la swapchiaindesc ?!?!");
+
+	WindowProps& propsRef = GetWndPropsUnsafe();
+
+	propsRef.Refreshrate = updatedDesc.BufferDesc.RefreshRate.Numerator;
+	propsRef.Fullscreen = !updatedDesc.Windowed;
 }
 
 void SetRasterizerState(RasterizerDesc desc)
@@ -260,4 +251,9 @@ void SetFillMode(EFillMode fillMode)
 void SetCullMode(ECullMode cullMode)
 {
 	SetRasterizerState({ sRasterDesc.FillMode, cullMode });
+}
+
+void SetFullscreen(bool fullscreen)
+{
+	checkf(GSwapChain->SetFullscreenState(fullscreen, nullptr) == S_OK, "impossibile toggleare il fullscreen :(");
 }

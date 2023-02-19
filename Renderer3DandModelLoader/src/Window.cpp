@@ -4,6 +4,8 @@
 
 #include "vendor/imgui/backends/imgui_impl_win32.h"
 
+static WindowProps sWndProps;
+
 void OnWndResize(uint32_t, uint32_t);
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -36,6 +38,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					SetCullMode(NoCull);
 			}
 			break;
+
+			case VK_F11:
+			{
+				SetWndFullscreen(!sWndProps.Fullscreen);
+			}
+			break;
 		}
 	}
 	break;
@@ -51,8 +59,6 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 	return DefWindowProcA(hWnd, uMsg, wParam, lParam);
 }
-
-static WindowProps sWndProps;
 
 void SpawnWindow(HINSTANCE hInstance, const WindowProps& props)
 {
@@ -82,6 +88,11 @@ const WindowProps& GetWndProps()
 	return sWndProps;
 }
 
+WindowProps& GetWndPropsUnsafe()
+{
+	return sWndProps;
+}
+
 float GetWndAspectRatio()
 {
 	return (float)sWndProps.Width / sWndProps.Height;
@@ -103,4 +114,9 @@ void OnWndResize(uint32_t newWidth, uint32_t newHeight)
 	sWndProps.Height = newHeight;
 	if(GD3DInitalized)
 		ResizeFrameBuffer(newWidth, newHeight);
+}
+
+void SetWndFullscreen(bool fullscreen)
+{
+	SetFullscreen(fullscreen);
 }

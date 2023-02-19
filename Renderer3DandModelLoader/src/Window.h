@@ -11,6 +11,8 @@ struct WindowProps
 
 void SpawnWindow(HINSTANCE hInstance, const WindowProps& props);
 const WindowProps& GetWndProps();
+WindowProps& GetWndPropsUnsafe();
 float GetWndAspectRatio();
+void SetWndFullscreen(bool fullscreen);
 
 void PullEvents();
