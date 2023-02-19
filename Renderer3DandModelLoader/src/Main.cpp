@@ -82,7 +82,6 @@ static ID3D11Buffer* mvpBuffer;
 Transform model;
 Camera cam;
 float cameraMoveSpeed = 2.0f;
-float cameraScroolMultiplier = 100.0f;
 float mouseSens = 0.2f;
 float mouseX = 0.0f;
 float mouseY = 0.0f;
@@ -168,11 +167,18 @@ void RenderMesh(Mesh* mesh)
     GContext->PSSetShaderResources(0, 1, tex2);
 }
 
+#define START_WND_TITLE "Renderer3D & Model loader"
+#define START_WIDTH 1600
+#define START_HEIGHT 900
+#define START_REFRESHRATE 0 // max
+#define START_VSYNC true
+#define START_FULLSCREEN false
+
 INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, INT nCmdShow)
 {   
     GInstance = hInstance;
 
-    SpawnWindow(hInstance, { 1600, 900, 0, false, false, "Finestrella" });
+    SpawnWindow(hInstance, { START_WIDTH, START_HEIGHT, START_REFRESHRATE, START_FULLSCREEN, START_VSYNC, START_WND_TITLE });
 
     InitD3D();
 
@@ -438,7 +444,7 @@ void RendererRender()
 
 void RendererEndScene()
 {
-    GSwapChain->Present(1, 0);
+    GSwapChain->Present(GetWndProps().VSync, 0);
 }
 
 void InitImGui()
@@ -585,10 +591,11 @@ void SceneSettings()
 {
     IM_SUBMENU
     (
-        "Boh",
+        "Stats",
         const WindowProps& wndProps = GetWndProps();
         ImGui::Text("Client size: %ix%i", wndProps.Width, wndProps.Height);
         ImGui::Text("(F11 to swap) Fullscreen state: %s", wndProps.Fullscreen ? "Fullscreen" : "Windowed");
+        ImGui::Text("FPS: %i %.3fms", int(1.0f / deltaTime), deltaTime * 1000.0f);
     );
 
     IM_SUBMENU
@@ -607,7 +614,6 @@ void SceneSettings()
         ImGui::DragFloat("Cam FOV", &cam.FOV, 0.1f);
         ImGui::DragFloat("Move speed", &cameraMoveSpeed, 0.01f);
         ImGui::DragFloat("Mouse sens", &mouseSens, 0.01f);
-        ImGui::DragFloat("Scroll multiplier", &cameraScroolMultiplier, 0.01f);
     );
 
     IM_SUBMENU
