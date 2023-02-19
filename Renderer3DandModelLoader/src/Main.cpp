@@ -24,7 +24,7 @@ void RendererRender();
 void RendererEndScene();
 
 #define VEC_TO_RAD(v) { DirectX::XMConvertToRadians(v.X), DirectX::XMConvertToRadians(v.Y), DirectX::XMConvertToRadians(v.Z) }
-#define VEC_TO_XVEC(v) { v.X, v.Y, v.Z }
+#define VEC_TO_XVEC(v) { v.X, v.Y, v.Z, 1.0f }
 
 static float s_ClearColor[4] =
 {
@@ -266,11 +266,11 @@ DirectX::XMMATRIX GetModelMatrix(const Transform& transform)
 {
     return
     {
-        DirectX::XMMatrixScaling(transform.Scale.X, transform.Scale.Y, transform.Scale.Z)
+        DirectX::XMMatrixTranslation(transform.Location.X, transform.Location.Y, transform.Location.Z)
         *
         DirectX::XMMatrixRotationRollPitchYawFromVector(VEC_TO_RAD(transform.Rotation))
         *
-        DirectX::XMMatrixTranslation(transform.Location.X, transform.Location.Y, transform.Location.Z)
+        DirectX::XMMatrixScaling(transform.Scale.X, transform.Scale.Y, transform.Scale.Z)
     };
 }
 
@@ -278,9 +278,9 @@ DirectX::XMMATRIX GetViewMatrix(Vec3 camLocation, Vec3 camRotation)
 {
     return
     {
-        DirectX::XMMatrixRotationRollPitchYawFromVector(VEC_TO_RAD(camRotation))
-        *
         DirectX::XMMatrixTranslation(camLocation.X, camLocation.Y, camLocation.Z)
+        *
+        DirectX::XMMatrixRotationRollPitchYawFromVector(VEC_TO_RAD(camRotation))
     };
 }
 
@@ -317,8 +317,6 @@ Vec3 GetRightVector(Vec3 rotation)
 
 Vec3 GetUpVector(Vec3 rotation)
 {
-    rotation = VEC_TO_RAD(rotation);
-
     DirectX::XMVECTOR up = DirectX::XMVector3Cross(VEC_TO_XVEC(GetForwardVector(rotation)), VEC_TO_XVEC(GetRightVector(rotation)));
 
     return { up.m128_f32[0], up.m128_f32[1], up.m128_f32[2] };
@@ -342,7 +340,7 @@ void MoveCameraRight(float direction)
     cam.Location += right * finalSpeed;
 }
 
-inline void MoveCameraUp(float direction)
+void MoveCameraUp(float direction)
 {
     Vec3 up = GetUpVector(cam.Rotation);
 
@@ -382,8 +380,8 @@ void UpdateCameraLocation()
 void UpdateCameraRotation()
 {
     double newX, newY;
-    newX = -ImGui::GetMousePos().x;
-    newY = -ImGui::GetMousePos().y;
+    newX = ImGui::GetMousePos().x;
+    newY = ImGui::GetMousePos().y;
 
     if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
     {
@@ -413,7 +411,7 @@ void Update()
     auto mvp = 
         GetModelMatrix(model)
         * 
-        GetViewMatrix(-cam.Location, cam.Rotation)
+        GetViewMatrix(-cam.Location, -cam.Rotation)
         * 
         GetPerspectiveMatrix(GetWndAspectRatio(), cam.FOV);
 
