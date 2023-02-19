@@ -350,4 +350,7 @@ MigrationBackup/
 .ionide/
 
 # custom filters
+
 *.filters
+!*/assets
+!*.obj

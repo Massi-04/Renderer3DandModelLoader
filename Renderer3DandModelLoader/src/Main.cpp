@@ -8,8 +8,8 @@
 #include "vendor/imgui/backends/imgui_impl_win32.h"
 #include "vendor/imgui/backends/imgui_impl_dx11.h"
 
-#include "FBXLoader.h"
 #include "TextureLoader.h"
+#include "ObjLoader.h"
 
 void InitApp();
 void Update();
@@ -116,14 +116,14 @@ void ClearMeshes()
     s_Meshes = std::vector<Mesh*>();
 }
 
-void AddMesh(const char* fbxFilePath)
+void AddMesh(const char* filePath)
 {
-   /* std::vector<MeshData> meshData = LoadFbx(fbxFilePath);
+    std::vector<MeshData> meshData = LoadObj(filePath);
 
     for (MeshData& md : meshData)
     {
         s_Meshes.push_back(new Mesh(&md));
-    }*/
+    }
 }
 
 void ClearTextures()
@@ -175,8 +175,6 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
     SpawnWindow(hInstance, { 1600, 900, 0, false, false, "Finestrella" });
 
     InitD3D();
-
-    //FbxLoaderInit();
 
     InitTimer();
 
@@ -518,7 +516,7 @@ void AssetsPanel(Mesh*& selectedMesh, Texture*& selectedTexture)
         }
         if (ImGui::Button("Add mesh"))
         {
-            String filePath = OpenFileDialog("Autodesk FBX (.fbx)\0*.fbx*\0\0");
+            String filePath = OpenFileDialog("Obj (.obj)\0*.obj*\0\0");
             if (!filePath.empty())
             {
                 AddMesh(filePath.c_str());
