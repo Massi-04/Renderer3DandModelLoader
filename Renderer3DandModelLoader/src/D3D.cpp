@@ -253,6 +253,27 @@ void SetCullMode(ECullMode cullMode)
 	SetRasterizerState({ sRasterDesc.FillMode, cullMode });
 }
 
+const char* GetFillModeStr(EFillMode fillMode)
+{
+	switch (fillMode)
+	{
+	case Wireframe: return "Wireframe";
+	case FillSolid: return "Solid";
+	default:        return "Unknown ?!?";
+	}
+}
+
+const char* GetCullModeStr(ECullMode cullMode)
+{
+	switch (cullMode)
+	{
+	case NoCull: return "None";
+	case Front:  return "Front";
+	case Back:   return "Back";
+	default:     return "Unknown ?!?";
+	}
+}
+
 void SetFullscreen(bool fullscreen)
 {
 	checkf(GSwapChain->SetFullscreenState(fullscreen, nullptr) == S_OK, "impossibile toggleare il fullscreen :(");

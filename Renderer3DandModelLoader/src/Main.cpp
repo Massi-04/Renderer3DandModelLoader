@@ -1,35 +1,47 @@
 #include "Core.h"
 #include "Window.h"
 #include "D3D.h"
-
-#include <DirectXMath.h>
-
-#include "vendor/imgui/imgui.h"
-#include "vendor/imgui/backends/imgui_impl_win32.h"
-#include "vendor/imgui/backends/imgui_impl_dx11.h"
-
-#include "TextureLoader.h"
-#include "ObjLoader.h"
+#include "FMath.h"
+#include "Input.h"
+#include "Resource.h"
+#include "Editor.h"
 
 void InitApp();
 void Update();
-
-void InitImGui();
-void ImGuiBegin();
-void ImGuiRender();
-void ImGuiEnd();
 
 void RendererBeginScene();
 void RendererRender();
 void RendererEndScene();
 
-#define VEC_TO_RAD(v) { DirectX::XMConvertToRadians(v.X), DirectX::XMConvertToRadians(v.Y), DirectX::XMConvertToRadians(v.Z) }
-#define VEC_TO_XVEC(v) { v.X, v.Y, v.Z, 1.0f }
-
 static float s_ClearColor[4] =
 {
     .2f, .2f, 0.0f, 1.0f
 };
+
+struct Transform
+{
+    Vec3 Location;
+    Vec3 Rotation;
+    Vec3 Scale;
+};
+
+struct Camera
+{
+    Vec3 Location;
+    Vec3 Rotation;
+    float FOV;
+};
+
+static ID3D11Buffer* mvpBuffer;
+Transform model;
+Camera cam;
+float cameraMoveSpeed = 2.0f;
+float mouseSens = 0.2f;
+Vec2 mousePos = { 0.0f, 0.0f };
+float totalTime = 0.0f;
+float deltaTime = 0.0f;
+
+LARGE_INTEGER freq, startTicks, currentTicks;
 
 Mesh* GetDefaultMesh()
 {
@@ -75,20 +87,8 @@ Mesh* GetDefaultMesh()
     memcpy(default_md.VertexBufferData.data(), vertexBufferData, sizeof(vertexBufferData));
     memcpy(default_md.IndexBufferData.data(), indexBufferData, sizeof(indexBufferData));
 
-    return new Mesh(&default_md);
+    return new Mesh("Default Quad", { default_md });
 }
-
-static ID3D11Buffer* mvpBuffer;
-Transform model;
-Camera cam;
-float cameraMoveSpeed = 2.0f;
-float mouseSens = 0.2f;
-float mouseX = 0.0f;
-float mouseY = 0.0f;
-float totalTime = 0.0f;
-float deltaTime = 0.0f;
-
-LARGE_INTEGER freq, startTicks, currentTicks;
 
 void InitTimer()
 {
@@ -117,12 +117,7 @@ void ClearMeshes()
 
 void AddMesh(const char* filePath)
 {
-    std::vector<MeshData> meshData = LoadObj(filePath);
-
-    for (MeshData& md : meshData)
-    {
-        s_Meshes.push_back(new Mesh(&md));
-    }
+    s_Meshes.push_back(Resource::Load<Mesh>(filePath));
 }
 
 void ClearTextures()
@@ -133,78 +128,85 @@ void ClearTextures()
 
     for (Mesh* m : s_Meshes)
     {
-        m->SetTexture(nullptr);
+        m->SetTextureForAllSubmeshes(nullptr);
     }
 }
 
 void AddTexture(const char* texFilePath)
 {
-    s_Textures.push_back(LoadTexture(texFilePath));
+    s_Textures.push_back(Resource::Load<Texture>(texFilePath));
 }
 
 void RenderMesh(Mesh* mesh)
 {
-    ID3D11Buffer* vb = mesh->GetVertexBuffer();
-    ID3D11Buffer* ib = mesh->GetIndexBuffer();
-
-    uint32_t vbStride = sizeof(Vertex);
-    uint32_t vbOffset = 0;
-
-    GContext->IASetVertexBuffers(0, 1, &vb, &vbStride, &vbOffset);
-    GContext->IASetIndexBuffer(ib, DXGI_FORMAT_R32_UINT, 0);
-
-    if (mesh->GetTexture())
+    for (Submesh* sub : mesh->GetSubmeshes())
     {
-        ID3D11ShaderResourceView* tex[] = { mesh->GetTexture()->GetTextureViewHandle() };
+        ID3D11Buffer* vb = sub->GetVertexBuffer();
+        ID3D11Buffer* ib = sub->GetIndexBuffer();
 
-        GContext->PSSetShaderResources(0, 1, tex);
+        uint32_t vbStride = sizeof(Vertex);
+        uint32_t vbOffset = 0;
+
+        GContext->IASetVertexBuffers(0, 1, &vb, &vbStride, &vbOffset);
+        GContext->IASetIndexBuffer(ib, DXGI_FORMAT_R32_UINT, 0);
+
+        if (mesh->GetTexture())
+        {
+            ID3D11ShaderResourceView* tex[] = { mesh->GetTexture()->GetTextureViewHandle() };
+
+            GContext->PSSetShaderResources(0, 1, tex);
+        }
+
+        GContext->DrawIndexed(mesh->GetProps().IndexCount, 0, 0);
+
+        ID3D11ShaderResourceView* tex2[] = { nullptr };
+
+        GContext->PSSetShaderResources(0, 1, tex2);
     }
-
-    GContext->DrawIndexed(mesh->GetIndexBufferCount(), 0, 0);
-
-    ID3D11ShaderResourceView* tex2[] = { nullptr };
-
-    GContext->PSSetShaderResources(0, 1, tex2);
 }
-
-#define START_WND_TITLE "Renderer3D & Model loader"
-#define START_WIDTH 1600
-#define START_HEIGHT 900
-#define START_REFRESHRATE 0 // max
-#define START_VSYNC true
-#define START_FULLSCREEN false
 
 INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, INT nCmdShow)
 {   
     GInstance = hInstance;
 
-    SpawnWindow(hInstance, { START_WIDTH, START_HEIGHT, START_REFRESHRATE, START_FULLSCREEN, START_VSYNC, START_WND_TITLE });
+    SpawnWindow(hInstance, 
+    {
+        1600, 900,   // width, height
+        0,           // refreshrate 0 = max
+        false,       // fullscreen
+        true,        // v-sync
+        "Renderer3D" // title
+    });
 
     InitD3D();
 
     InitTimer();
 
+    Input::Init();
+
     InitApp();
 
-    InitImGui();
+    Editor::Init();
 
     while (GAppShouldRun)
-    {
+    {   
+        Input::UpdateKeyTable();
+        
         PullEvents();
 
         double currentTime = GetTime();
         deltaTime = currentTime - totalTime;
         totalTime = currentTime;
         
-        ImGuiBegin();
+        Editor::Begin();
 
         Update();
 
         RendererBeginScene();
         RendererRender();
 
-        ImGuiRender();
-        ImGuiEnd();
+        Editor::Render();
+        Editor::End();
         
         RendererEndScene();
     }
@@ -252,81 +254,23 @@ void InitApp()
     GContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     GContext->IASetInputLayout(inputLayout);
 
-    mvpBuffer = CreateBuffer(Dynamic, ConstBuffer, Write, sizeof(DirectX::XMMATRIX), 0);
+    mvpBuffer = CreateBuffer(Dynamic, ConstBuffer, Write, sizeof(Mat4), 0);
 
     GContext->VSSetConstantBuffers(0, 1, &mvpBuffer);
 
     Mesh* defaultMesh = GetDefaultMesh();
 
-    Texture* defaultTex = LoadTexture("assets/doom.jpg");
+    Texture* defaultTex = Resource::Load<Texture>("assets\\doom.jpg");
 
-    defaultMesh->SetTexture(defaultTex);
+    defaultMesh->SetTextureForAllSubmeshes(defaultTex);
 
     s_Meshes.push_back(defaultMesh);
     s_Textures.push_back(defaultTex);
 }
 
-Vec3 GetForwardVector(Vec3 rotation)
-{
-    rotation = VEC_TO_RAD(rotation);
-
-    Vec3 forward;
-
-    forward.X = cos(rotation.X) * sin(rotation.Y);
-    forward.Y = -sin(rotation.X);
-    forward.Z = cos(rotation.X) * cos(rotation.Y);
-
-    return forward;
-}
-
-Vec3 GetRightVector(Vec3 rotation)
-{
-    rotation = VEC_TO_RAD(rotation);
-
-    Vec3 right;
-
-    right.X = cos(rotation.Y);
-    right.Y = 0.0f;
-    right.Z = -sin(rotation.Y);
-
-    return right;
-}
-
-Vec3 GetUpVector(Vec3 rotation)
-{
-    DirectX::XMVECTOR up = DirectX::XMVector3Cross(VEC_TO_XVEC(GetForwardVector(rotation)), VEC_TO_XVEC(GetRightVector(rotation)));
-
-    return { up.m128_f32[0], up.m128_f32[1], up.m128_f32[2] };
-}
-
-DirectX::XMMATRIX GetModelMatrix(const Transform& transform)
-{
-    return
-    {
-        DirectX::XMMatrixTranslation(transform.Location.X, transform.Location.Y, transform.Location.Z)
-        *
-        DirectX::XMMatrixRotationRollPitchYawFromVector(VEC_TO_RAD(transform.Rotation))
-        *
-        DirectX::XMMatrixScaling(transform.Scale.X, transform.Scale.Y, transform.Scale.Z)
-    };
-}
-
-DirectX::XMMATRIX GetViewMatrix(Vec3 camLocation, Vec3 camRotation)
-{
-    auto defaultView = DirectX::XMMatrixLookAtLH(VEC_TO_XVEC(camLocation), VEC_TO_XVEC((GetForwardVector(camRotation) + camLocation)), VEC_TO_XVEC(GetUpVector(camRotation)));
-    auto zRotation = DirectX::XMMatrixRotationZ(DirectX::XMConvertToRadians(camRotation.Z));
-
-    return defaultView * zRotation;
-}
-
-DirectX::XMMATRIX GetPerspectiveMatrix(float aspectRatio, float fov)
-{
-    return DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(fov), aspectRatio, 0.1f, 1000.0f);
-}
-
 void MoveCameraForward(float direction)
 {
-    Vec3 forward = GetForwardVector(cam.Rotation);
+    Vec3 forward = FMath::GetForwardVector(cam.Rotation);
 
     float finalSpeed = cameraMoveSpeed * deltaTime * direction;
 
@@ -335,7 +279,7 @@ void MoveCameraForward(float direction)
 
 void MoveCameraRight(float direction)
 {
-    Vec3 right = GetRightVector(cam.Rotation);
+    Vec3 right = FMath::GetRightVector(cam.Rotation);
 
     float finalSpeed = cameraMoveSpeed * deltaTime * direction;
 
@@ -344,7 +288,7 @@ void MoveCameraRight(float direction)
 
 void MoveCameraUp(float direction)
 {
-    Vec3 up = GetUpVector(cam.Rotation);
+    Vec3 up = FMath::GetUpVector(cam.Rotation);
 
     float finalSpeed = cameraMoveSpeed * deltaTime * direction;
 
@@ -353,27 +297,27 @@ void MoveCameraUp(float direction)
 
 void UpdateCameraLocation()
 {
-    if (ImGui::IsKeyDown(ImGuiKey_A))
+    if (Input::IsKeyDown(EKeyCode::A))
     {
         MoveCameraRight(-1.0f);
     }
-    if (ImGui::IsKeyDown(ImGuiKey_D))
+    if (Input::IsKeyDown(EKeyCode::D))
     {
         MoveCameraRight(1.0f);
     }
-    if (ImGui::IsKeyDown(ImGuiKey_Q))
+    if (Input::IsKeyDown(EKeyCode::Q))
     {
         MoveCameraUp(-1.0f);
     }
-    if (ImGui::IsKeyDown(ImGuiKey_E))
+    if (Input::IsKeyDown(EKeyCode::E))
     {
         MoveCameraUp(1.0f);
     }
-    if (ImGui::IsKeyDown(ImGuiKey_S))
+    if (Input::IsKeyDown(EKeyCode::S))
     {
         MoveCameraForward(-1.0f);
     }
-    if (ImGui::IsKeyDown(ImGuiKey_W))
+    if (Input::IsKeyDown(EKeyCode::W))
     {
         MoveCameraForward(1.0f);
     }
@@ -381,14 +325,12 @@ void UpdateCameraLocation()
 
 void UpdateCameraRotation()
 {
-    double newX, newY;
-    newX = ImGui::GetMousePos().x;
-    newY = ImGui::GetMousePos().y;
+    Vec2 newMousePos = Input::GetMousePos();
 
-    if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
+    if (Input::IsKeyDown(EKeyCode::RightMouseBtn))
     {
-        float deltaX = mouseX - newX;
-        float deltaY = mouseY - newY;
+        float deltaX = mousePos.X - newMousePos.X;
+        float deltaY = mousePos.Y - newMousePos.Y;
 
         if (deltaX != 0.0f)
         {
@@ -400,8 +342,7 @@ void UpdateCameraRotation()
         }
     }
 
-    mouseX = newX;
-    mouseY = newY;
+    mousePos = newMousePos;
 }
 
 void Update()
@@ -411,19 +352,19 @@ void Update()
 
     // update MVP
     auto mvp = 
-        GetModelMatrix(model)
+        FMath::GetModelMatrix(model.Location, model.Rotation, model.Scale)
         *
-        GetViewMatrix(cam.Location, cam.Rotation)
+        FMath::GetViewMatrix(cam.Location, cam.Rotation)
         *
-        GetPerspectiveMatrix(GetWndAspectRatio(), cam.FOV);
+        FMath::GetPerspectiveMatrix(GetWndAspectRatio(), cam.FOV, 0.1f, 1000.0f);
 
-    mvp = DirectX::XMMatrixTranspose(mvp);
+    mvp = FMath::GetMatrixTransposed(mvp);
 
     D3D11_MAPPED_SUBRESOURCE res = {};
 
     GContext->Map(mvpBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &res);
 
-    memcpy(res.pData, &mvp, sizeof(DirectX::XMMATRIX));
+    memcpy(res.pData, &mvp, sizeof(Mat4));
 
     GContext->Unmap(mvpBuffer, 0);
 }
@@ -445,217 +386,4 @@ void RendererRender()
 void RendererEndScene()
 {
     GSwapChain->Present(GetWndProps().VSync, 0);
-}
-
-void InitImGui()
-{
-    ImGui::CreateContext();
-    ImGui::StyleColorsDark();
-    checkf(ImGui_ImplWin32_Init(GWnd), "impossibile inizializzare imgui per win32");
-    checkf(ImGui_ImplDX11_Init(GDevice, GContext), "impossibile inizializzare imgui per dx11");
-}
-
-void ImGuiBegin()
-{
-    ImGui_ImplDX11_NewFrame();
-    ImGui_ImplWin32_NewFrame();
-    ImGui::NewFrame();
-}
-
-#define IM_SUBMENU(MenuName, Code)\
-if(ImGui::CollapsingHeader(MenuName, ImGuiTreeNodeFlags_DefaultOpen)) \
-{ \
-    ImGui::Spacing(); \
-    ImGui::Spacing(); \
-    Code \
-}\
-ImGui::Spacing(); \
-ImGui::Spacing();
-
-void TexturePropertyPanel(Texture* texture)
-{
-    ImGui::Text("Name: %s", texture->GetName().c_str());
-    ImGui::Text("Width: %i", texture->GetWidth());
-    ImGui::Text("Height: %i", texture->GetHeight());
-    ImGui::Image((void*)texture->GetTextureViewHandle(), ImVec2(100, 100));
-}
-
-void MeshPropertyPanel(Mesh* mesh, const std::vector<Texture*>& availTextures)
-{
-    ImGui::Text("Name: %s", mesh->GetName().c_str());
-    ImGui::Text("Poly count: %i", mesh->GetPolyCount());
-    ImGui::Text("Vertices: %i", mesh->GetVertexBufferCount());
-    ImGui::Text("Indices: %i", mesh->GetIndexBufferCount());
-
-    Texture* currentlyBoundTexture = mesh->GetTexture();
-
-    ImGui::Text("Currently bound texture: %s", currentlyBoundTexture ? currentlyBoundTexture->GetName().c_str() : "NULL");
-
-    if (ImGui::Button("Remove texture binding"))
-    {
-        mesh->SetTexture(nullptr);
-        currentlyBoundTexture = nullptr;
-    }
-
-    for (uint32_t i = 0; i < availTextures.size(); i++)
-    {
-        bool isBound = currentlyBoundTexture == availTextures[i];
-
-        ImGui::PushID(i);
-        if (ImGui::Selectable(availTextures[i]->GetName().c_str(), isBound) && !isBound)
-        {
-            mesh->SetTexture(availTextures[i]);
-        }
-        ImGui::PopID();
-    }
-}
-
-void AssetsPanel(Mesh*& selectedMesh, Texture*& selectedTexture)
-{
-    IM_SUBMENU
-    (
-        "Mesh assets",
-        if (ImGui::Button("Remove all meshes"))
-        {
-            ClearMeshes();
-            selectedMesh = nullptr;
-        }
-        if (ImGui::Button("Add mesh"))
-        {
-            String filePath = OpenFileDialog("Obj (.obj)\0*.obj*\0\0");
-            if (!filePath.empty())
-            {
-                AddMesh(filePath.c_str());
-            }
-        }
-        for (Mesh* m : s_Meshes)
-        {
-            ImGui::PushID(m);
-            if (ImGui::Selectable(m->GetName().c_str(), selectedMesh == m))
-            {
-                selectedMesh = m;
-            }
-            ImGui::PopID();
-        }
-    );
-    IM_SUBMENU
-    (
-        "Texture assets",
-        if (ImGui::Button("Remove all textures"))
-        {
-            ClearTextures();
-            selectedTexture = nullptr;
-        }
-        if (ImGui::Button("Add texture"))
-        {
-            String filePath = OpenFileDialog("Images (.jpg, .png, .jpeg)\0*.jpg;*.png;*.jpeg\0\0");
-            if (!filePath.empty())
-            {
-                AddTexture(filePath.c_str());
-            }
-        }
-        for (Texture* t : s_Textures)
-        {
-            ImGui::PushID(t);
-            if (ImGui::Selectable(t->GetName().c_str(), selectedTexture == t))
-            {
-                selectedTexture = t;
-            }
-            ImGui::PopID();
-        }
-    );
-}
-
-const char* GetFillModeStr(EFillMode fillMode)
-{
-    switch (fillMode)
-    {
-        case Wireframe: return "Wireframe";
-        case FillSolid: return "Solid";
-        default:        return "Unknown ?!?";
-    }
-}
-
-const char* GetCullModeStr(ECullMode cullMode)
-{
-    switch (cullMode)
-    {
-        case NoCull: return "None";
-        case Front:  return "Front";
-        case Back:   return "Back";
-        default:     return "Unknown ?!?";
-    }
-}
-
-void SceneSettings()
-{
-    IM_SUBMENU
-    (
-        "Stats",
-        const WindowProps& wndProps = GetWndProps();
-        ImGui::Text("Client size: %ix%i", wndProps.Width, wndProps.Height);
-        ImGui::Text("(F11 to swap) Fullscreen state: %s", wndProps.Fullscreen ? "Fullscreen" : "Windowed");
-        ImGui::Text("FPS: %i %.3fms", int(1.0f / deltaTime), deltaTime * 1000.0f);
-    );
-
-    IM_SUBMENU
-    (
-        "Renderer / Rasterizer",
-        RasterizerDesc rd = GetCurrentRasterizerDesc();
-        ImGui::Text("(F3 to swap) Fill mode: %s", GetFillModeStr(rd.FillMode));
-        ImGui::Text("(F4 to swap) Cull mode: %s", GetCullModeStr(rd.CullMode));
-    );
-
-    IM_SUBMENU
-    (
-        "Camera",
-        ImGui::DragFloat3("Cam location", &cam.Location.X, 0.1f);
-        ImGui::DragFloat3("Cam rotation", &cam.Rotation.X, 0.1f);
-        ImGui::DragFloat("Cam FOV", &cam.FOV, 0.1f);
-        ImGui::DragFloat("Move speed", &cameraMoveSpeed, 0.01f);
-        ImGui::DragFloat("Mouse sens", &mouseSens, 0.01f);
-    );
-
-    IM_SUBMENU
-    (
-        "Model",
-        ImGui::DragFloat3("Model location", &model.Location.X, 0.1f);
-        ImGui::DragFloat3("Model rotation", &model.Rotation.X, 0.1f);
-        ImGui::DragFloat3("Model scale", &model.Scale.X, 0.1f);
-    );
-}
-
-void ImGuiRender()
-{
-    static Mesh* selectedMesh = nullptr;
-    static Texture* selectedTexture = nullptr;
-
-    ImGui::SetNextWindowPos({ 0.0f, 0.0f });
-    ImGui::Begin("Scene settings");
-    SceneSettings();
-    ImGui::End();
-
-    ImGui::Begin("Assets");
-    AssetsPanel(selectedMesh, selectedTexture);
-    ImGui::End();
-
-    if (selectedMesh)
-    {
-        ImGui::Begin("Mesh properties");
-        MeshPropertyPanel(selectedMesh, s_Textures);
-        ImGui::End();
-    }
-
-    if (selectedTexture)
-    {
-        ImGui::Begin("Texture properties");
-        TexturePropertyPanel(selectedTexture);
-        ImGui::End();
-    }
-}
-
-void ImGuiEnd()
-{
-    ImGui::Render();
-    ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 }

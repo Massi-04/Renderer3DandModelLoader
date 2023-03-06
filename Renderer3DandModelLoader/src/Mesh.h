@@ -2,6 +2,27 @@
 
 #include "Core.h"
 
+struct Vertex
+{
+    Vertex()
+    {
+        Location = { 0.0f, 0.0f, 0.0f, 0.0f };
+        Color = { 0.0f, 0.0f, 0.0f, 0.0f };
+        TextureCoords = { 0.0f, 0.0f };
+    }
+
+    Vertex(Vec4 loc, Vec4 col, Vec2 texCoord)
+    {
+        Location = loc;
+        Color = col;
+        TextureCoords = texCoord;
+    }
+
+    Vec4 Location;
+    Vec4 Color;
+    Vec2 TextureCoords;
+};
+
 struct MeshData
 {
     String Name;
@@ -10,31 +31,47 @@ struct MeshData
     uint32_t PolyCount;
 };
 
+struct MeshProps
+{
+    String Name;
+    uint32_t PolyCount;
+    uint32_t VertexCount;
+    uint32_t IndexCount;
+};
+
+class Submesh
+{
+public:
+    Submesh(const MeshData& meshData);
+    ~Submesh();
+
+public:
+    const MeshProps& GetProps() const { return mProps; }
+    struct ID3D11Buffer* GetVertexBuffer() const { return mVertexBuffer; }
+    struct ID3D11Buffer* GetIndexBuffer() const { return mIndexBuffer; }
+
+public:
+    class Texture* Texture;
+
+private:
+    MeshProps mProps;
+    struct ID3D11Buffer* mVertexBuffer;
+    struct ID3D11Buffer* mIndexBuffer;
+};
+
 class Mesh
 {
 public:
-    Mesh(MeshData* meshData);
+    Mesh(const String& name, const std::vector<MeshData>& meshData);
     ~Mesh();
 
-    inline struct ID3D11Buffer* GetVertexBuffer() const { return m_VertexBuffer; }
-    inline struct ID3D11Buffer* GetIndexBuffer() const { return m_IndexBuffer; }
-    inline class Texture* GetTexture() const { return m_Texture; }
-    inline const String& GetName() const { return m_Name; }
-    inline uint32_t GetVertexBufferCount() const { return m_VertexBufferCount; }
-    inline uint32_t GetIndexBufferCount() const { return m_IndexBufferCount; }
-    inline uint32_t GetPolyCount() const { return m_PolyCount; }
-
-    void SetTexture(class Texture* texture)
-    {
-        m_Texture = texture;
-    }
+public:
+    const MeshProps& GetProps() const { return mProps; }
+    const std::vector<Submesh*>& GetSubmeshes() const { return mSubmeshes; }
+    void SetTextureForAllSubmeshes(class Texture* texture);
+    class Texture* GetTexture(uint32_t submeshIndex = 0) { return mSubmeshes[submeshIndex]->Texture; }
 
 private:
-    struct ID3D11Buffer* m_VertexBuffer;
-    struct ID3D11Buffer* m_IndexBuffer;
-    class Texture* m_Texture;
-    String m_Name;
-    uint32_t m_VertexBufferCount;
-    uint32_t m_IndexBufferCount;
-    uint32_t m_PolyCount;
+    MeshProps mProps;
+    std::vector<Submesh*> mSubmeshes;
 };
