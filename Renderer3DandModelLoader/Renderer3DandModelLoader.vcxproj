@@ -195,6 +195,7 @@
   <ItemGroup>
     <Image Include="assets\doom.jpg" />
     <Image Include="assets\hellknight\hellknight_texture.jpg" />
+    <Image Include="assets\light\light.png" />
     <Image Include="assets\negan\negan_texture.png" />
   </ItemGroup>
   <ItemGroup>

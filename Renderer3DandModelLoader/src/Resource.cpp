@@ -66,6 +66,7 @@ Mesh* LoadMeshFromFile(const String& path)
         {
             Vertex vertex = {};
 
+            // vertices
             vertex.Location =
             {
                 attrib.vertices[3 * index.vertex_index + 0],
@@ -74,6 +75,7 @@ Mesh* LoadMeshFromFile(const String& path)
                 1.0f
             };
 
+            // texture coords
             if (index.texcoord_index != -1)
             {
                 vertex.TextureCoords =
@@ -83,6 +85,18 @@ Mesh* LoadMeshFromFile(const String& path)
                 };
             }
 
+            // normals
+            if (index.normal_index != -1)
+            {
+                vertex.Normal =
+                {
+                    attrib.normals[3 * index.normal_index + 0],
+                    attrib.normals[3 * index.normal_index + 1],
+                    attrib.normals[3 * index.normal_index + 2],
+                };
+            }
+
+            // color
             vertex.Color = { 1.0f, 1.0f, 1.0f, 1.0f };
 
             md.VertexBufferData.push_back(vertex);

@@ -32,9 +32,26 @@ struct Camera
     float FOV;
 };
 
+struct PointLightAttenuation
+{
+    float Exponential;
+    float Linear;
+    float Constant;
+};
+
+struct PointLight
+{
+    Vec3 Location;
+    Vec3 Color;
+    Vec3 AmbientIntensity;
+    Vec3 DiffuseIntensity;
+    PointLightAttenuation Attenuation;
+};
+
 static ID3D11Buffer* mvpBuffer;
 Transform model;
 Camera cam;
+PointLight light;
 float cameraMoveSpeed = 2.0f;
 float mouseSens = 0.2f;
 Vec2 mousePos = { 0.0f, 0.0f };
@@ -43,51 +60,44 @@ float deltaTime = 0.0f;
 
 LARGE_INTEGER freq, startTicks, currentTicks;
 
-Mesh* GetDefaultMesh()
+void GetDefaultQuadData(Vertex* outVertexData, uint32_t* outIndexData, Vec4 color)
 {
-    Vertex vertexBufferData[] =
-    {
-        Vertex
-        (
-            { -0.5f, -0.5f, 0.0f, 1.0f },
-            {  1.0f,  0.0f, 0.0f, 1.0f },
-            {  0.0,   1.0f }
-        ),
-        Vertex
-        (
-            { -0.5f,  0.5f, 0.0f, 1.0f },
-            {  0.0f,  1.0f, 0.0f, 1.0f },
-            {  0.0f,  0.0f }
-        ),
-        Vertex
-        (
-            {  0.5f,  0.5f, 0.0f, 1.0f },
-            {  0.0f,  0.0f, 1.0f, 1.0f },
-            {  1.0f,  0.0f }
-        ),
-        Vertex
-        (
-            {  0.5f, -0.5f, 0.0f, 1.0f },
-            {  0.0f,  0.0f, 1.0f, 1.0f },
-            {  1.0f,  1.0f }
-        )
-    };
+    check(outVertexData && outIndexData);
 
-    uint32_t indexBufferData[] =
-    {
-        0, 1, 2,
-        0, 2, 3
-    };
+    outVertexData[0] = Vertex
+    (
+        { -0.5f, -0.5f, 0.0f, 1.0f },
+        color,
+        { 0.0f, 0.0f, 0.0f },
+        { 0.0,   1.0f }
+    );
 
-    MeshData default_md;
-    default_md.Name = "Default Quad";
-    default_md.PolyCount = 2;
-    default_md.VertexBufferData = std::vector<Vertex>(4);
-    default_md.IndexBufferData = std::vector<uint32_t>(6);
-    memcpy(default_md.VertexBufferData.data(), vertexBufferData, sizeof(vertexBufferData));
-    memcpy(default_md.IndexBufferData.data(), indexBufferData, sizeof(indexBufferData));
+    outVertexData[1] = Vertex
+    (
+        { -0.5f,  0.5f, 0.0f, 1.0f },
+        color,
+        { 0.0f, 0.0f, 0.0f },
+        { 0.0f,  0.0f }
+    );
 
-    return new Mesh("Default Quad", { default_md });
+    outVertexData[2] = Vertex
+    (
+        { 0.5f,  0.5f, 0.0f, 1.0f },
+        color,
+        { 0.0f, 0.0f, 0.0f },
+        { 1.0f,  0.0f }
+    );
+
+    outVertexData[3] = Vertex
+    (
+        { 0.5f, -0.5f, 0.0f, 1.0f },
+        color,
+        { 0.0f, 0.0f, 0.0f },
+        { 1.0f,  1.0f }
+    );
+
+    outIndexData[0] = 0; outIndexData[1] = 1; outIndexData[2] = 2;
+    outIndexData[3] = 0; outIndexData[4] = 2; outIndexData[5] = 3;
 }
 
 void InitTimer()
@@ -104,6 +114,7 @@ double GetTime()
 
 std::vector<Mesh*> s_Meshes;
 std::vector<Texture*> s_Textures;
+Mesh* sLight = nullptr;
 
 void ClearMeshes()
 {
@@ -150,14 +161,14 @@ void RenderMesh(Mesh* mesh)
         GContext->IASetVertexBuffers(0, 1, &vb, &vbStride, &vbOffset);
         GContext->IASetIndexBuffer(ib, DXGI_FORMAT_R32_UINT, 0);
 
-        if (mesh->GetTexture())
+        if (sub->Texture)
         {
-            ID3D11ShaderResourceView* tex[] = { mesh->GetTexture()->GetTextureViewHandle() };
+            ID3D11ShaderResourceView* tex[] = { sub->Texture->GetTextureViewHandle() };
 
             GContext->PSSetShaderResources(0, 1, tex);
         }
 
-        GContext->DrawIndexed(mesh->GetProps().IndexCount, 0, 0);
+        GContext->DrawIndexed(sub->GetProps().IndexCount, 0, 0);
 
         ID3D11ShaderResourceView* tex2[] = { nullptr };
 
@@ -222,9 +233,15 @@ void InitApp()
     model.Rotation = { 0.0f, 0.0f, 0.0f };
     model.Scale = { 1.0f, 1.0f, 1.0f };
 
-    cam.Location = { 0.0f, 0.0f, -1.0f };
+    cam.Location = { 0.0f, 0.0f, -2.2f };
     cam.Rotation = { 0.0f, 0.0f, 0.0f };
     cam.FOV = 60;
+
+    light.Location = { -1.0f, 0.0f, 0.0f };
+    light.Color = { 1.0f, 1.0f, 1.0f };
+    light.AmbientIntensity = { 0.1f, 0.1f, 0.1f };
+    light.DiffuseIntensity = { 1.0f, 1.0f, 1.0f };
+    light.Attenuation = { 2.6f, 1.0f, 0.38f };
 
     // d3d
 
@@ -235,12 +252,13 @@ void InitApp()
     {
         { "Location", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(Vertex, Location), D3D11_INPUT_PER_VERTEX_DATA, 0 },
         { "Color",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(Vertex, Color),    D3D11_INPUT_PER_VERTEX_DATA, 0 },
+        { "Normal",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(Vertex, Normal),    D3D11_INPUT_PER_VERTEX_DATA, 0 },
         { "TextureCoords", 0, DXGI_FORMAT_R32G32_FLOAT, 0, offsetof(Vertex, TextureCoords), D3D11_INPUT_PER_VERTEX_DATA, 0 }
     };
 
     ID3D11InputLayout* inputLayout;
 
-    checkf(GDevice->CreateInputLayout(inputLayoutDesc, 3, vertexShaderCode->GetBufferPointer(), vertexShaderCode->GetBufferSize(), &inputLayout) == S_OK, "impossibile creare input layout");
+    checkf(GDevice->CreateInputLayout(inputLayoutDesc, 4, vertexShaderCode->GetBufferPointer(), vertexShaderCode->GetBufferSize(), &inputLayout) == S_OK, "impossibile creare input layout");
 
     ID3D11VertexShader* vertexShader = CreateVertexShader(vertexShaderCode);
     ID3D11PixelShader* pixelShader = CreatePixelShader(pixelShaderCode);
@@ -258,14 +276,53 @@ void InitApp()
 
     GContext->VSSetConstantBuffers(0, 1, &mvpBuffer);
 
-    Mesh* defaultMesh = GetDefaultMesh();
+    Mesh* defaultMesh = nullptr;
+    Texture* defaultTexture = nullptr;
 
-    Texture* defaultTex = Resource::Load<Texture>("assets\\doom.jpg");
+#if 0 // default quad
+    
+    {
+        MeshData md;
+        md.Name = "sub0";
+        md.PolyCount = 2;
+        md.VertexBufferData = std::vector<Vertex>(4);
+        md.IndexBufferData = std::vector<uint32_t>(6);
 
-    defaultMesh->SetTextureForAllSubmeshes(defaultTex);
+        GetDefaultQuadData(md.VertexBufferData.data(), md.IndexBufferData.data(), { 1.0f, 1.0f, 1.0f });
+
+        defaultMesh = new Mesh("Default quad", { md });
+        defaultTexture = Resource::Load<Texture>("assets\\doom.jpg");
+    }
+
+#else
+
+    {
+        defaultMesh = Resource::Load<Mesh>("assets\\negan\\negan_model.obj");
+        defaultTexture = Resource::Load<Texture>("assets\\negan\\negan_texture.png");
+
+        model.Rotation.Y = 180;
+        cam.Location.Y = 1.5f;
+        cam.Rotation.X = 12.2f;
+        light.Location.Y = 5;
+    }
+
+#endif
+
+    MeshData md;
+    md.Name = "sub0";
+    md.PolyCount = 2;
+    md.VertexBufferData = std::vector<Vertex>(4);
+    md.IndexBufferData = std::vector<uint32_t>(6);
+
+    GetDefaultQuadData(md.VertexBufferData.data(), md.IndexBufferData.data(), { 1.0f, 1.0f, 1.0f });
+
+    sLight = new Mesh("Light", { md });
+    sLight->SetTextureForAllSubmeshes(Resource::Load<Texture>("assets\\light\\light.png"));
+
+    defaultMesh->SetTextureForAllSubmeshes(defaultTexture);
 
     s_Meshes.push_back(defaultMesh);
-    s_Textures.push_back(defaultTex);
+    s_Textures.push_back(defaultTexture);
 }
 
 void MoveCameraForward(float direction)
@@ -345,21 +402,40 @@ void UpdateCameraRotation()
     mousePos = newMousePos;
 }
 
+static Mat4 sMeshMvp;
+static Mat4 sLightMvp;
+
 void Update()
 { 
     UpdateCameraLocation();
     UpdateCameraRotation();
 
+    Mat4 viewMatrix = FMath::GetViewMatrix(cam.Location, cam.Rotation);
+    Mat4 perspectiveMatrix = FMath::GetPerspectiveMatrix(GetWndAspectRatio(), cam.FOV, 0.1f, 1000.0f);
+
     // update MVP
-    auto mvp = 
+    sMeshMvp =
         FMath::GetModelMatrix(model.Location, model.Rotation, model.Scale)
         *
-        FMath::GetViewMatrix(cam.Location, cam.Rotation)
+        viewMatrix
         *
-        FMath::GetPerspectiveMatrix(GetWndAspectRatio(), cam.FOV, 0.1f, 1000.0f);
+        perspectiveMatrix;
 
-    mvp = FMath::GetMatrixTransposed(mvp);
+    sMeshMvp = FMath::GetMatrixTransposed(sMeshMvp);
 
+    // update MVP
+    sLightMvp =
+        FMath::GetModelMatrix(light.Location, { 0.0f, 0.0f, 0.0f }, { .4f, .4f, .4f })
+        *
+        viewMatrix
+        *
+        perspectiveMatrix;
+
+    sLightMvp = FMath::GetMatrixTransposed(sLightMvp);
+}
+
+void UploadMvp(Mat4 mvp)
+{
     D3D11_MAPPED_SUBRESOURCE res = {};
 
     GContext->Map(mvpBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &res);
@@ -377,10 +453,27 @@ void RendererBeginScene()
 
 void RendererRender()
 {
+    // render meshes
+    UploadMvp(sMeshMvp);
+
     for (Mesh* m : s_Meshes)
     {
         RenderMesh(m);
     }
+
+    // render light
+    UploadMvp(sLightMvp);
+
+    EnableBlending();
+
+    ECullMode prev = GetCurrentRasterizerDesc().CullMode;
+    SetCullMode(NoCull);
+
+    RenderMesh(sLight);
+
+    SetCullMode(prev);
+
+    DisableBlending();
 }
 
 void RendererEndScene()

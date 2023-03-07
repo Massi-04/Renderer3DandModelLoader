@@ -2,6 +2,7 @@ struct VSOutput
 {
 	float4 Loc : SV_POSITION; // SV_POSITION
 	float4 Col : Color;
+	float3 Norm : Normal;
 	float2 Coords : TextureCoords;
 };
 

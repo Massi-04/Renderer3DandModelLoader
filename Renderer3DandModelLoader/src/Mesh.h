@@ -8,18 +8,21 @@ struct Vertex
     {
         Location = { 0.0f, 0.0f, 0.0f, 0.0f };
         Color = { 0.0f, 0.0f, 0.0f, 0.0f };
+        Normal = { 0.0f, 0.0f, 0.0f };
         TextureCoords = { 0.0f, 0.0f };
     }
 
-    Vertex(Vec4 loc, Vec4 col, Vec2 texCoord)
+    Vertex(Vec4 loc, Vec4 col, Vec3 normal, Vec2 texCoord)
     {
         Location = loc;
         Color = col;
+        Normal = normal;
         TextureCoords = texCoord;
     }
 
     Vec4 Location;
     Vec4 Color;
+    Vec3 Normal;
     Vec2 TextureCoords;
 };
 

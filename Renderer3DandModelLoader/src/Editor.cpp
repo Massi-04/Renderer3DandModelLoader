@@ -87,8 +87,23 @@ struct Camera
     Vec3 Rotation;
     float FOV;
 };
+struct PointLightAttenuation
+{
+    float Exponential;
+    float Linear;
+    float Constant;
+};
+struct PointLight
+{
+    Vec3 Location;
+    Vec3 Color;
+    Vec3 AmbientIntensity;
+    Vec3 DiffuseIntensity;
+    PointLightAttenuation Attenuation;
+};
 extern Transform model;
 extern Camera cam;
+extern PointLight light;
 extern float cameraMoveSpeed;
 extern float mouseSens;
 #pragma endregion
@@ -194,6 +209,16 @@ void SceneSettings()
         ImGui::DragFloat3("Model rotation", &model.Rotation.X, 0.1f);
         ImGui::DragFloat3("Model scale", &model.Scale.X, 0.1f);
     );
+
+    IM_SUBMENU
+    (
+        "Light",
+        ImGui::DragFloat3("Light location", &light.Location.X, 0.1f);
+        ImGui::DragFloat3("Light color", &light.Color.X, 0.1f);
+        ImGui::DragFloat3("Light ambient intensity", &light.AmbientIntensity.X, 0.1f);
+        ImGui::DragFloat3("Light diffuse intensity", &light.DiffuseIntensity.X, 0.1f);
+        ImGui::DragFloat3("Light attenuation", &light.Attenuation.Exponential, 0.1f);
+    );
 }
 
 void Editor::Render()
@@ -201,7 +226,6 @@ void Editor::Render()
     static Mesh* selectedMesh = nullptr;
     static Texture* selectedTexture = nullptr;
 
-    ImGui::SetNextWindowPos({ 0.0f, 0.0f });
     ImGui::Begin("Scene settings");
     SceneSettings();
     ImGui::End();
