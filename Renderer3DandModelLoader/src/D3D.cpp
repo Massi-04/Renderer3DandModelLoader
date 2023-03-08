@@ -10,7 +10,6 @@ ID3D11RenderTargetView* GRenderTargetView = nullptr;
 ID3D11DepthStencilView* GDepthBufferView = nullptr;
 ID3D11RasterizerState* GRasterizerState = nullptr;
 ID3D11SamplerState* GSamplerState = nullptr;
-ID3D11BlendState* GBlendState = nullptr;
 
 static const char const* SHADER_ENTRY_POINT = "main";
 
@@ -58,25 +57,6 @@ void InitD3D()
 	ResizeFrameBuffer(wndProps.Width, wndProps.Height);
 
 	SetRasterizerState(sRasterDesc);
-
-	D3D11_BLEND_DESC blendDesc;
-	ZeroMemory(&blendDesc, sizeof(blendDesc));
-
-	D3D11_RENDER_TARGET_BLEND_DESC rtbd;
-	ZeroMemory(&rtbd, sizeof(rtbd));
-
-	rtbd.BlendEnable = true;
-	rtbd.SrcBlend = D3D11_BLEND_SRC_COLOR;
-	rtbd.DestBlend = D3D11_BLEND_BLEND_FACTOR;
-	rtbd.BlendOp = D3D11_BLEND_OP_ADD;
-	rtbd.SrcBlendAlpha = D3D11_BLEND_ONE;
-	rtbd.DestBlendAlpha = D3D11_BLEND_ZERO;
-	rtbd.BlendOpAlpha = D3D11_BLEND_OP_ADD;
-	rtbd.RenderTargetWriteMask = D3D10_COLOR_WRITE_ENABLE_ALL;
-
-	blendDesc.RenderTarget[0] = rtbd;
-
-	checkf(GDevice->CreateBlendState(&blendDesc, &GBlendState) == S_OK, "Impossibile creare il blend state");
 
 	D3D11_SAMPLER_DESC samplerDesc = {};
 	samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
@@ -297,16 +277,4 @@ const char* GetCullModeStr(ECullMode cullMode)
 void SetFullscreen(bool fullscreen)
 {
 	checkf(GSwapChain->SetFullscreenState(fullscreen, nullptr) == S_OK, "impossibile toggleare il fullscreen :(");
-}
-
-void EnableBlending()
-{
-	float blendFactor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-
-	GContext->OMSetBlendState(GBlendState, blendFactor, 0xffffffff);
-}
-
-void DisableBlending()
-{
-	GContext->OMSetBlendState(0, 0, 0xffffffff);
 }

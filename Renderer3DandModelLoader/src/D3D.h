@@ -11,7 +11,6 @@ extern ID3D11RenderTargetView* GRenderTargetView;
 extern ID3D11DepthStencilView* GDepthBufferView;
 extern ID3D11RasterizerState* GRasterizerState;
 extern ID3D11SamplerState* GSamplerState;
-extern ID3D11BlendState* GBlendState;
 
 enum EBindFlags
 {
@@ -85,5 +84,4 @@ void SetCullMode(ECullMode cullMode);
 const char* GetFillModeStr(EFillMode fillMode);
 const char* GetCullModeStr(ECullMode cullMode);
 void SetFullscreen(bool fullscreen);
-void EnableBlending();
-void DisableBlending();
+
