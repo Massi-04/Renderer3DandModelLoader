@@ -23,6 +23,12 @@ static ID3D11Texture2D* s_DepthBuffer;
 
 static RasterizerDesc sRasterDesc = { FillSolid, Back } ;
 
+#if _DEBUG
+	#define SWAPCHAIN_FLAG_DEBUG D3D11_CREATE_DEVICE_DEBUG
+#else
+	#define SWAPCHAIN_FLAG_DEBUG 0
+#endif
+
 void InitD3D()
 {
     const WindowProps& wndProps = GetWndProps();
@@ -47,7 +53,7 @@ void InitD3D()
     (
         D3D11CreateDeviceAndSwapChain
         (
-            nullptr, D3D_DRIVER_TYPE_HARDWARE, 0, D3D11_CREATE_DEVICE_DEBUG, 0, 0, D3D11_SDK_VERSION, &sd, &GSwapChain, &GDevice, 0, &GContext
+            nullptr, D3D_DRIVER_TYPE_HARDWARE, 0, SWAPCHAIN_FLAG_DEBUG, 0, 0, D3D11_SDK_VERSION, &sd, &GSwapChain, &GDevice, 0, &GContext
         ) == S_OK,
         "Impossibile creare device e swapchain"
     );

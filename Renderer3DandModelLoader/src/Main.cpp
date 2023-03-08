@@ -150,18 +150,16 @@ void RenderMesh(Mesh* mesh)
         GContext->IASetVertexBuffers(0, 1, &vb, &vbStride, &vbOffset);
         GContext->IASetIndexBuffer(ib, DXGI_FORMAT_R32_UINT, 0);
 
-        if (mesh->GetTexture())
-        {
-            ID3D11ShaderResourceView* tex[] = { mesh->GetTexture()->GetTextureViewHandle() };
+        ID3D11ShaderResourceView* tex[1] = { nullptr };
 
-            GContext->PSSetShaderResources(0, 1, tex);
+        if (sub->Texture)
+        {
+            tex[0] = sub->Texture->GetTextureViewHandle();
         }
 
-        GContext->DrawIndexed(mesh->GetProps().IndexCount, 0, 0);
+        GContext->PSSetShaderResources(0, 1, tex);
 
-        ID3D11ShaderResourceView* tex2[] = { nullptr };
-
-        GContext->PSSetShaderResources(0, 1, tex2);
+        GContext->DrawIndexed(sub->GetProps().IndexCount, 0, 0);
     }
 }
 
