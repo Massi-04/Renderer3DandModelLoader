@@ -40,11 +40,11 @@ Mat4 FMath::GetModelMatrix(Vec3 location, Vec3 rotation, Vec3 scale)
 {
     return
     {
-        DirectX::XMMatrixTranslation(location.X, location.Y, location.Z)
+        DirectX::XMMatrixScaling(scale.X, scale.Y, scale.Z)
         *
         DirectX::XMMatrixRotationRollPitchYawFromVector(VEC_TO_RAD(rotation))
         *
-        DirectX::XMMatrixScaling(scale.X, scale.Y, scale.Z)
+        DirectX::XMMatrixTranslation(location.X, location.Y, location.Z)
     };
 }
 

@@ -43,53 +43,6 @@ float deltaTime = 0.0f;
 
 LARGE_INTEGER freq, startTicks, currentTicks;
 
-Mesh* GetDefaultMesh()
-{
-    Vertex vertexBufferData[] =
-    {
-        Vertex
-        (
-            { -0.5f, -0.5f, 0.0f, 1.0f },
-            {  1.0f,  0.0f, 0.0f, 1.0f },
-            {  0.0,   1.0f }
-        ),
-        Vertex
-        (
-            { -0.5f,  0.5f, 0.0f, 1.0f },
-            {  0.0f,  1.0f, 0.0f, 1.0f },
-            {  0.0f,  0.0f }
-        ),
-        Vertex
-        (
-            {  0.5f,  0.5f, 0.0f, 1.0f },
-            {  0.0f,  0.0f, 1.0f, 1.0f },
-            {  1.0f,  0.0f }
-        ),
-        Vertex
-        (
-            {  0.5f, -0.5f, 0.0f, 1.0f },
-            {  0.0f,  0.0f, 1.0f, 1.0f },
-            {  1.0f,  1.0f }
-        )
-    };
-
-    uint32_t indexBufferData[] =
-    {
-        0, 1, 2,
-        0, 2, 3
-    };
-
-    MeshData default_md;
-    default_md.Name = "Default Quad";
-    default_md.PolyCount = 2;
-    default_md.VertexBufferData = std::vector<Vertex>(4);
-    default_md.IndexBufferData = std::vector<uint32_t>(6);
-    memcpy(default_md.VertexBufferData.data(), vertexBufferData, sizeof(vertexBufferData));
-    memcpy(default_md.IndexBufferData.data(), indexBufferData, sizeof(indexBufferData));
-
-    return new Mesh("Default Quad", { default_md });
-}
-
 void InitTimer()
 {
     QueryPerformanceFrequency(&freq);
@@ -216,12 +169,12 @@ void InitApp()
 {
     // app
 
-    model.Location = { 0.0f, 0.0f, 0.0f };
-    model.Rotation = { 0.0f, 0.0f, 0.0f };
+    model.Location = { 0.0f, -1.7f, 2.2f };
+    model.Rotation = { 0.0f, 180.0f, 0.0f };
     model.Scale = { 1.0f, 1.0f, 1.0f };
 
-    cam.Location = { 0.0f, 0.0f, -1.0f };
-    cam.Rotation = { 0.0f, 0.0f, 0.0f };
+    cam.Location = { 0.0f, 0.0f, 0.0f };
+    cam.Rotation = { 20.0f, 0.0f, 0.0f };
     cam.FOV = 60;
 
     // d3d
@@ -256,14 +209,13 @@ void InitApp()
 
     GContext->VSSetConstantBuffers(0, 1, &mvpBuffer);
 
-    Mesh* defaultMesh = GetDefaultMesh();
+    Mesh* defaultMesh = Resource::Load<Mesh>("assets\\negan\\negan_model.obj");
+    Texture* defaultTexture = Resource::Load<Texture>("assets\\negan\\negan_texture.png");
 
-    Texture* defaultTex = Resource::Load<Texture>("assets\\doom.jpg");
-
-    defaultMesh->SetTextureForAllSubmeshes(defaultTex);
+    defaultMesh->SetTextureForAllSubmeshes(defaultTexture);
 
     s_Meshes.push_back(defaultMesh);
-    s_Textures.push_back(defaultTex);
+    s_Textures.push_back(defaultTexture);
 }
 
 void MoveCameraForward(float direction)

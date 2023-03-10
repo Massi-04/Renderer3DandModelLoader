@@ -201,7 +201,6 @@ void Editor::Render()
     static Mesh* selectedMesh = nullptr;
     static Texture* selectedTexture = nullptr;
 
-    ImGui::SetNextWindowPos({ 0.0f, 0.0f });
     ImGui::Begin("Scene settings");
     SceneSettings();
     ImGui::End();
